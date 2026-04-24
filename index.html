@@ -1605,7 +1605,7 @@ kbd {
 
       <div class="top-bar">
         <div class="top-bar-left">
-          <button class="btn-back" id="back-btn" onclick="goBackFromQuiz()">🏠 Home</button>
+          <button class="btn-back" id="back-btn" onclick="goToQuizList()">☰ Quiz List</button>
           <div class="deck-name" id="deck-name">Deck</div>
         </div>
         <div class="top-bar-right">
@@ -2392,13 +2392,41 @@ function toggleRandomizeChoices() {
 }
 
 // ============================================================
-// NAVIGATION: Back buttons (unchanged except goBackFromQuiz)
+// NAVIGATION: Back buttons
 // ============================================================
 function goToUpload() {
-  // Legacy: now just opens the upload panel on the home screen
   showHomeScreen(true);
 }
 
+// "Quiz List" button in quiz screen — goes back to the deck list for the current APKG/folder
+function goToQuizList() {
+  if (S.autoAdvanceTimer) { clearTimeout(S.autoAdvanceTimer); S.autoAdvanceTimer = null; }
+  stopTimer();
+  S.media.forEach(u => URL.revokeObjectURL(u));
+  S.media.clear();
+  Object.assign(S, {
+    notes:[], shuffles:[], answered:{}, idx:0,
+    quizComplete:false, revealAnswers:false, submitted:false, answerableCount:0
+  });
+  try { localStorage.removeItem('apkg_score_' + S.deckKey); } catch {}
+  document.getElementById('checklist-sidebar').style.display = 'none';
+  document.getElementById('checklist-list').innerHTML = '';
+
+  if (S.isDeckSelection && S.apkgDecks.length) {
+    // Multi-deck APKG — show its deck tree
+    renderDeckSelectionScreen(S.apkgDecks, S.apkgFile ? S.apkgFile.name : '');
+    show('selection');
+  } else if (S.hasSelection && S.loadedQuizzes.length) {
+    // Folder of APKGs — show folder quiz list
+    renderSelectionScreen();
+    show('selection');
+  } else {
+    // Single standalone deck — nothing to list, go home
+    showHomeScreen(false);
+  }
+}
+
+// "🏠 Home" in site header — always goes to full home (all cached APKGs)
 function goBackFromQuiz() {
   if (S.autoAdvanceTimer) { clearTimeout(S.autoAdvanceTimer); S.autoAdvanceTimer = null; }
   stopTimer();
@@ -2424,7 +2452,7 @@ function toggleUploadPanel(forceOpen) {
   if (btn) btn.textContent = open ? '✕ Close' : '📥 Load New Deck';
 }
 
-// Main home-screen renderer — always shows selection screen
+// Main home-screen renderer — always shows ALL cached APKGs (full home)
 async function showHomeScreen(openUploadPanel) {
   // Close upload panel by default unless explicitly requested
   const panel = document.getElementById('sel-upload-panel');
@@ -2432,21 +2460,9 @@ async function showHomeScreen(openUploadPanel) {
   const loadBtn = document.getElementById('sel-load-btn');
   if (loadBtn) loadBtn.textContent = '📥 Load New Deck';
 
-  if (S.isDeckSelection && S.apkgDecks.length) {
-    // Multi-deck APKG — show deck tree
-    renderDeckSelectionScreen(S.apkgDecks, S.apkgFile ? S.apkgFile.name : '');
-    show('selection');
-  } else if (S.hasSelection && S.loadedQuizzes.length) {
-    // Folder loaded — show folder quizzes
-    const selTitle = document.getElementById('sel-title');
-    if (selTitle) selTitle.textContent = 'Home';
-    renderSelectionScreen();
-    show('selection');
-  } else {
-    // No folder loaded — show cached IDB decks
-    await renderCachedDecksScreen();
-    show('selection');
-  }
+  // Always render the cached-decks home (not APKG-specific deck list)
+  await renderCachedDecksScreen();
+  show('selection');
 
   if (openUploadPanel) toggleUploadPanel(true);
 }
