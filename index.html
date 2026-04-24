@@ -1022,7 +1022,7 @@ hr.div { border: none; border-top: 1px solid var(--card-border); margin: 14px 0;
 .sel-upload-panel .upload-actions { margin-top: 0; }
 
 /* Cached deck section on home */
-.cached-decks-section { margin-bottom: 6px; }
+/* Home screen handled by home-section classes */
 .home-empty-state {
   text-align: center;
   padding: 50px 20px 30px;
@@ -1031,6 +1031,80 @@ hr.div { border: none; border-top: 1px solid var(--card-border); margin: 14px 0;
 .home-empty-state .he-icon { font-size: 52px; display: block; margin-bottom: 16px; }
 .home-empty-state h3 { font-size: 18px; color: var(--text-dim); margin-bottom: 8px; font-weight: 700; }
 .home-empty-state p { font-size: 14px; line-height: 1.7; max-width: 340px; margin: 0 auto 20px; }
+
+/* Collapsible home section */
+.home-section { margin-bottom: 22px; }
+.home-section-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 16px;
+  background: var(--surface); border: 1px solid var(--card-border);
+  border-radius: var(--radius); cursor: pointer; user-select: none;
+  transition: background .15s, border-color .15s;
+  font-weight: 700; font-size: 14px;
+}
+.home-section-header:hover { border-color: var(--accent); background: var(--accent-dim); }
+.home-section-header.open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-color: var(--accent); }
+.home-section-title { flex: 1; display: flex; align-items: center; gap: 8px; }
+.home-section-badge {
+  font-size: 11px; font-family: 'DM Mono', monospace;
+  background: rgba(74,144,226,0.15); border: 1px solid rgba(74,144,226,0.25);
+  border-radius: 10px; padding: 2px 8px; color: var(--accent); font-weight: 400;
+}
+.home-section-chevron {
+  font-size: 12px; color: var(--text-muted); transition: transform .2s;
+  font-family: 'DM Mono', monospace;
+}
+.home-section-header.open .home-section-chevron { transform: rotate(180deg); }
+.home-section-body {
+  display: none; border: 1px solid var(--accent);
+  border-top: none; border-radius: 0 0 var(--radius) var(--radius);
+  padding: 14px; background: var(--surface2);
+}
+.home-section-body.open { display: block; }
+
+/* Delete button on deck card */
+.deck-delete-btn {
+  flex-shrink: 0; background: none;
+  border: 1px solid rgba(239,83,80,0.35); border-radius: 7px;
+  padding: 4px 9px; color: var(--red); font-size: 13px;
+  cursor: pointer; transition: background .15s, border-color .15s;
+  opacity: 0.7; line-height: 1;
+}
+.deck-delete-btn:hover { background: rgba(239,83,80,0.15); border-color: var(--red); opacity: 1; }
+
+/* GitHub deck entry */
+.gh-deck-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; border-radius: 10px;
+  border: 1px solid var(--card-border); background: rgba(0,0,0,.15);
+  margin-bottom: 8px; transition: border-color .15s, background .15s;
+}
+.gh-deck-card:last-child { margin-bottom: 0; }
+.gh-deck-card:hover { border-color: var(--accent); background: var(--accent-dim); }
+.gh-deck-name { flex: 1; font-size: 14px; font-weight: 700; color: var(--text); }
+.gh-deck-meta { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--text-muted); white-space: nowrap; }
+.gh-deck-meta.cached { color: var(--green); }
+.gh-btn {
+  flex-shrink: 0; padding: 5px 14px; border-radius: 7px; border: none;
+  font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: opacity .15s, transform .1s;
+}
+.gh-btn:hover { opacity: .85; transform: translateY(-1px); }
+.gh-btn.load  { background: var(--accent); color: #fff; }
+.gh-btn.cached-load { background: rgba(76,175,80,0.18); color: var(--green); border: 1px solid rgba(76,175,80,.4); }
+.gh-section-actions {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;
+}
+.gh-refresh-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 13px; border-radius: 7px;
+  background: transparent; border: 1px solid var(--card-border);
+  color: var(--text-dim); font-family: inherit; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: border-color .15s, color .15s, background .15s;
+}
+.gh-refresh-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.gh-loading { color: var(--text-muted); font-style: italic; font-size: 13px; padding: 12px 4px; }
+.gh-error { color: var(--red); font-size: 13px; padding: 10px 4px; }
 .btn-load-first {
   display: inline-flex;
   align-items: center;
@@ -2073,6 +2147,17 @@ async function idbKeys() {
     });
   } catch { return []; }
 }
+async function idbDelete(name) {
+  try {
+    const db = await openDeckIDB();
+    return new Promise(res => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(name);
+      tx.oncomplete = () => res(true);
+      tx.onerror    = () => res(false);
+    });
+  } catch { return false; }
+}
 
 // ── Fetch deck list from GitHub API ──
 async function fetchGitHubDeckList() {
@@ -2380,35 +2465,141 @@ async function renderCachedDecksScreen() {
         <h3>No decks loaded yet</h3>
         <p>Load a deck from GitHub or upload your own .apkg file to get started.</p>
         <button class="btn-load-first" onclick="toggleUploadPanel(true)">📥 Load a Deck</button>
-      </div>`;
+      </div>
+      <div id="gh-section-wrap"></div>`;
+    renderGitHubSection(document.getElementById('gh-section-wrap'), []);
     return;
   }
 
   if (selSubtitle) selSubtitle.textContent = `${cachedKeys.length} cached deck${cachedKeys.length !== 1 ? 's' : ''}`;
 
-  const cards = cachedKeys.map(name => `
-    <div class="quiz-card" onclick="loadCachedDeck('${escHtml(name)}')">
-      <div class="quiz-card-icon">📦</div>
-      <div class="quiz-card-info">
+  const cachedCards = cachedKeys.map(name => `
+    <div class="quiz-card" style="cursor:default;">
+      <div class="quiz-card-icon" style="cursor:pointer;" onclick="loadCachedDeck('${escHtml(name)}')" title="Load deck">📦</div>
+      <div class="quiz-card-info" style="cursor:pointer;" onclick="loadCachedDeck('${escHtml(name)}')">
         <div class="quiz-card-name">${escHtml(name)}</div>
         <div class="quiz-card-count count-loaded"><span class="count-dot"></span>⚡ Cached</div>
       </div>
-      <div class="quiz-card-arrow">→</div>
+      <button class="deck-delete-btn" onclick="deleteCachedDeck('${escHtml(name)}')" title="Delete from cache">🗑</button>
     </div>`).join('');
 
   container.innerHTML = `
-    <div class="quiz-group cached-decks-section">
-      <div class="quiz-group-header">
-        📦 Cached Decks
-        <span class="quiz-group-count">${cachedKeys.length}</span>
+    <div class="home-section" id="cached-section">
+      <div class="home-section-header open" id="cached-section-hdr" onclick="toggleHomeSection('cached')">
+        <span class="home-section-title">📦 Cached Decks <span class="home-section-badge">${cachedKeys.length}</span></span>
+        <span class="home-section-chevron">▲</span>
       </div>
-      <div class="quiz-cards-list">${cards}</div>
+      <div class="home-section-body open" id="cached-section-body">
+        <div class="quiz-cards-list" id="cached-cards-list">${cachedCards}</div>
+      </div>
+    </div>
+    <div id="gh-section-wrap"></div>`;
+
+  renderGitHubSection(document.getElementById('gh-section-wrap'), cachedKeys);
+}
+
+function toggleHomeSection(id) {
+  const hdr  = document.getElementById(id + '-section-hdr');
+  const body = document.getElementById(id + '-section-body');
+  if (!hdr || !body) return;
+  const isOpen = body.classList.toggle('open');
+  hdr.classList.toggle('open', isOpen);
+}
+
+async function renderGitHubSection(wrap, cachedKeys) {
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <div class="home-section" id="gh-section">
+      <div class="home-section-header" id="gh-section-hdr" onclick="toggleHomeSection('gh')">
+        <span class="home-section-title">🌐 GitHub Decks</span>
+        <span class="home-section-chevron">▼</span>
+      </div>
+      <div class="home-section-body" id="gh-section-body">
+        <div class="gh-section-actions">
+          <button class="gh-refresh-btn" onclick="refreshGitHubSection()">↺ Refresh</button>
+        </div>
+        <div id="gh-deck-list"><div class="gh-loading">⏳ Fetching available decks…</div></div>
+      </div>
     </div>`;
+
+  await loadGitHubDeckList(cachedKeys);
+}
+
+let _ghDeckFiles = [];
+async function loadGitHubDeckList(cachedKeys) {
+  const listEl = document.getElementById('gh-deck-list');
+  if (!listEl) return;
+  if (!cachedKeys) cachedKeys = await idbKeys();
+  try {
+    _ghDeckFiles = await fetchGitHubDeckList();
+    if (!_ghDeckFiles.length) {
+      listEl.innerHTML = '<div class="gh-loading">No .apkg files found in the GitHub decks folder.</div>';
+      return;
+    }
+    const hdr = document.getElementById('gh-section-hdr');
+    const badge = hdr ? hdr.querySelector('.home-section-badge') : null;
+    if (hdr) {
+      const titleSpan = hdr.querySelector('.home-section-title');
+      if (titleSpan) titleSpan.innerHTML = `🌐 GitHub Decks <span class="home-section-badge">${_ghDeckFiles.length}</span>`;
+    }
+    const rows = _ghDeckFiles.map((f, idx) => {
+      const name = f.name.replace(/\.apkg$/i, '');
+      const isCached = cachedKeys.includes(name);
+      const sizeMb = f.size ? (f.size / 1048576).toFixed(1) + ' MB' : '';
+      const metaHtml = isCached
+        ? `<span class="gh-deck-meta cached">⚡ Cached</span>`
+        : `<span class="gh-deck-meta">${sizeMb}</span>`;
+      const btnHtml = isCached
+        ? `<button class="gh-btn cached-load" onclick="loadGhDeck(${idx})">▶ Load</button>`
+        : `<button class="gh-btn load" onclick="loadGhDeck(${idx})">⬇ Download</button>`;
+      return `
+        <div class="gh-deck-card" id="gh-card-${idx}">
+          <span style="font-size:22px;flex-shrink:0;">${isCached ? '📦' : '🌐'}</span>
+          <span class="gh-deck-name">${escHtml(name)}</span>
+          ${metaHtml}
+          ${btnHtml}
+        </div>`;
+    }).join('');
+    listEl.innerHTML = rows;
+  } catch(e) {
+    listEl.innerHTML = `<div class="gh-error">⚠ Could not fetch GitHub deck list: ${escHtml(e.message)}</div>`;
+  }
+}
+
+async function loadGhDeck(idx) {
+  const f = _ghDeckFiles[idx];
+  if (!f) return;
+  await loadDeckByInfo(f);
+}
+
+async function refreshGitHubSection() {
+  const listEl = document.getElementById('gh-deck-list');
+  if (listEl) listEl.innerHTML = '<div class="gh-loading">⏳ Fetching available decks…</div>';
+  const cachedKeys = await idbKeys();
+  await loadGitHubDeckList(cachedKeys);
+}
+
+async function deleteCachedDeck(name) {
+  if (!confirm(`Delete "${name}" from cache? You'll need to re-download it next time.`)) return;
+  const ok = await idbDelete(name);
+  if (ok) {
+    showToast(`🗑 "${name}" removed from cache.`, 'ok', 3000);
+    await renderCachedDecksScreen();
+  } else {
+    showToast('⚠ Failed to delete from cache.', 'warn', 3000);
+  }
 }
 
 async function loadCachedDeck(name) {
-  const url = DECK_BASE_URL + encodeURIComponent(name + '.apkg');
-  await loadDeckByUrl(url, name);
+  // Load from IDB cache — no URL needed
+  const buf = await idbGet(name);
+  if (buf) {
+    const file = new File([buf], name + '.apkg', { type: 'application/octet-stream' });
+    await loadApkg(file);
+  } else {
+    showToast('⚠ Cached deck not found. Try re-downloading.', 'warn', 4000);
+    await renderCachedDecksScreen();
+  }
 }
 
 
